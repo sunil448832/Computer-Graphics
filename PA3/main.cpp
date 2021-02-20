@@ -70,8 +70,7 @@ void display(void)
         vector<float> color = phong_shadding(h, n, l);
         if (dot_prod(n, view) > 0)
         {
-            // cout<<points[0][0]<<" "<<points[0][1]<<" "<<points[0][2]<<endl;
-            // cout<<points[1][0]<<" "<<points[1][1]<<" "<<points[1][2]<<endl;
+
             glBegin(GL_LINES);
             glVertex3f(points[0][0], points[0][1], points[0][2]);
             glVertex3f(points[1][0], points[1][1], points[1][2]);
@@ -103,7 +102,6 @@ int main(int argc, char **argv)
 {
     string line;
     ifstream MyReadFile("cat01.off");
-    //float count=0,xmin=1000,xmax=0,ymin=1000,ymax=0,zmin=1000,zmax=0;
     int count = 0;
     getline(MyReadFile, line);
     getline(MyReadFile, line);
@@ -151,11 +149,6 @@ int main(int argc, char **argv)
     MyReadFile.close();
     cout << triangles.size();
 
-    // cout<<xmin<<" "<<xmax<<endl;
-    // cout<<ymin<<" "<<ymax<<endl;
-    // cout<<zmin<<" "<<zmax<<endl;
-    // cout<<vec.size();
-
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
     glutInitWindowPosition(50, 50);
@@ -163,7 +156,6 @@ int main(int argc, char **argv)
     glutCreateWindow("Programming Assignment 2");
     init();
     glutDisplayFunc(display);
-    //glutReshapeFunc (reshapeFcn);
     glutMainLoop();
     return 0;
 }
