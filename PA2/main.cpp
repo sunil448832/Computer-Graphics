@@ -1,102 +1,161 @@
-#include<iostream>
-#include<algorithm>
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/glut.h> // (or others, depending on the system in use)
+//compilation command g++ gl.cpp -o gl -lGL -lGLU -lglut
+//run command ./gl
+
+#include <GL/glut.h>
+#include <bits/stdc++.h>
+#include "utils.h"
 using namespace std;
 
-void init (void)
+vector<vector<float>> vec;
+vector<vector<int>> triangles;
+vector<float> view = {0, 0, 0};
+vector<float> light = {-50, -60, 160};
+vector<float> light_vec = {0.0, 0, 0};
+
+float xmin = 1000, xmax = 0, ymin = 1000, ymax = 0, zmin = 1000, zmax = 0;
+
+void init(void)
 {
-	glClearColor (1.0, 1.0, 1.0, 0.0); // Set display-window color to white.
-	glMatrixMode (GL_PROJECTION); // Set projection parameters.
-	gluOrtho2D (0, 300, 300, 1);// Orthogonal projection: [x,y,z]--->[x,y,0]
+    glClearColor(1.0, 1.0, 1.0, 0.0);
+    glMatrixMode(GL_MODELVIEW);
+
+    // objects, camera cordinates and view direction
+    float xref = (xmin + xmax) / 2;
+    float yref = (ymin + ymax) / 2;
+    float zref = zmin;
+    // float camx=xref+10,camy=yref,camz=zref-10;
+    float camx = xref - 105, camy = 80, camz = zref - 30;
+    float Vx = 0, Vy = 1, Vz = 0;
+    view[0] = camx - xref, view[1] = camy - yref, view[2] = camz - zref;
+    light_vec[0] = xref - light[0], light_vec[1] = yref - light[1], light_vec[2] = zref - light[2];
+
+    // frustom cordinates
+    float xwMin = xmin - 5, ywMin = ymin - 5, xwMax = xmax + 5, ywMax = xmax + 5;
+    float dnear = 20, dfar = zmax + 200;
+    vector<vector<float>> cord = frustom_cordinates(xwMin, xwMax, ywMin, ywMax, dnear, dfar);
+    cout << " Frustom Cordinates: " << endl;
+    show(cord);
+
+    // world cordinates transformation with respect to camera
+    gluLookAt(camx, camy, camz, xref, yref, zref, Vx, Vy, Vz);
+    // projection matrix calculation
+    glMatrixMode(GL_PROJECTION);
+    glFrustum(xwMin, xwMax, ywMin, ywMax, dnear, dfar);
+    float model[16];
+    glGetFloatv(GL_PROJECTION_MATRIX, model);
+    vector<vector<float>> projection_matrix = reshape(model);
+
+    // normalized frustom cordinates
+    vector<vector<float>> norm_cord = normalized_cordinates(projection_matrix, cord);
+    cout << " \nNormalised Frustom Cordinates: " << endl;
+    show(norm_cord);
 }
-void dispPoint (void)
+
+void display(void)
 {
-	glClear (GL_COLOR_BUFFER_BIT); // Clear display window.
-	glColor3f (1.0, 0.0, 0.0); // Set point color to green.
-	glPointSize(10.0f); // Set point size
-    //Bounding Box Algorithm starts
-
-    //Input Points
-    int x0 = 100, y0 = 200;
-    int x1 = 200, y1 = 100;
-    int x2 = 200, y2 = 200;
-
-    //parameters
-    int del_x0 = x1-x0, del_y0= y1-y0;
-    int del_x1 = x2-x1, del_y1= y2-y1;
-    int del_x2 = x0-x2, del_y2= y0-y2;
-
-    int xmin, ymin, xmax, ymax;
-
-    int tempmax = max(x0,x1);
-    xmax = max(tempmax,x2);
-
-    int tempmin = min(x0,x1);
-    xmin = min(tempmin,x2);
-
-    tempmax = max(y0,y1);
-    ymax = max(tempmax,y2);
-
-    tempmin = min(y0,y1);
-    ymin = min(tempmin,y2);
-
-    int q = xmax - xmin;
-
-    int f0 = ((xmin - x0)*del_y0) - ((ymax-y0)*del_x0);
-    int f1 = ((xmin - x1)*del_y1) - ((ymax-y1)*del_x1);
-    int f2 = ((xmin - x2)*del_y2) - ((ymax-y2)*del_x2);
-
-    int g0 = ((x2 - x0)*del_y0) - ((y2-y0)*del_x0);
-    int g1 = ((x0 - x1)*del_y1) - ((y0-y1)*del_x1);
-    int g2 = ((x1 - x2)*del_y2) - ((y1-y2)*del_x2);
-
-    float alpha, beta, gamma;
-
-    for(int i=ymin; i<=ymax; i++)
+    glClear(GL_COLOR_BUFFER_BIT);
+    glColor3f(0.0, 0.0, 0.0); // Set fill color to green.
+    glPolygonMode(GL_FRONT, GL_FILL);
+    glPolygonMode(GL_BACK, GL_LINE); // Wire-frame back face.
+    int cnt = 0;
+    for (auto tri : triangles)
     {
-        for(int j=xmin; j<=xmax; j++)
+        int p0 = tri[0], p1 = tri[1], p2 = tri[2];
+        vector<vector<float>> points = {vec[p0], vec[p1], vec[p2]};
+        vector<float> n = normal_vec(vec[p0], vec[p1], vec[p2]);
+        vector<float> l = normalize(light_vec);
+        view = normalize(view);
+        vector<float> h = normalize(add(light_vec, view));
+
+        vector<float> color = phong_shadding(h, n, l);
+        if (dot_prod(n, view) > 0)
         {
-            alpha = f1/g1;
-            beta = f2/g2;
-            gamma = f0/g0;
-            if((alpha+beta+gamma)==1.0 && alpha>=0 && beta>=0 && gamma>=0)
-            {
-                glBegin(GL_POINTS);// Marks the beginning of the vertices list
-                glVertex2i(j,i); // Specify point location.
-            }
 
-            f0 = f0 + del_y0;
-            f1 = f1 + del_y1;
-            f2 = f2 + del_y2;
+            glBegin(GL_LINES);
+            glVertex3f(points[0][0], points[0][1], points[0][2]);
+            glVertex3f(points[1][0], points[1][1], points[1][2]);
+            glEnd();
+
+            glBegin(GL_LINES);
+            glVertex3f(points[1][0], points[1][1], points[1][2]);
+            glVertex3f(points[2][0], points[2][1], points[2][2]);
+            glEnd();
+
+            glBegin(GL_LINES);
+            glVertex3f(points[2][0], points[2][1], points[2][2]);
+            glVertex3f(points[0][0], points[0][1], points[0][2]);
+            glEnd();
+
+            glBegin(GL_TRIANGLES);
+            glColor3f(color[0], color[1], color[2]);
+            glVertex3f(points[0][0], points[0][1], points[0][2]);
+            glVertex3f(points[1][0], points[1][1], points[1][2]);
+            glVertex3f(points[2][0], points[2][1], points[2][2]);
+            glEnd();
         }
-        f0 = f0 - (q*del_y0);
-        f1 = f1 - (q*del_y1);
-        f2 = f2 - (q*del_y2);
-
-        /*f0 = f0 + del_x0;
-        f1 = f1 + del_x1;
-        f2 = f2 + del_x2;*/
     }
 
-
-    //Bounding algorithm ends
-    /*glBegin(GL_TRIANGLES);// Marks the beginning of the vertices list
-    glVertex2i (100, 200); // Specify point location.
-    glVertex2i (200, 100); // Specify point location.
-    glVertex2i (200, 200); // Specify point location.*/
-	glEnd( );
-	glFlush( );
+    glFlush();
 }
-int main (int argc, char** argv)
+
+int main(int argc, char **argv)
 {
-	glutInit (&argc, argv); // Initialize GLUT.
-	glutInitDisplayMode (GLUT_SINGLE | GLUT_RGB); // Set display mode.
-	glutInitWindowPosition (20, 20); // Set top-left display-window position.
-	glutInitWindowSize (300, 300); // Set display-window width and height.
-	glutCreateWindow("CSL7450: PA-1: Bounding Box Algorithm"); // Create display window.
-	init ( ); // Execute initialization procedure.
-	glutDisplayFunc (dispPoint); // Send graphics to display window.
-	glutMainLoop ( ); // Display everything and wait.
+    string line;
+    ifstream MyReadFile("cat01.off");
+    int count = 0;
+    getline(MyReadFile, line);
+    getline(MyReadFile, line);
+    istringstream iss(line);
+    vector<string> results(istream_iterator<string>{iss},
+                           istream_iterator<string>());
+
+    while (count < stoi(results[0]))
+    {
+        getline(MyReadFile, line);
+        vector<float> v;
+        count++;
+        istringstream iss(line);
+        vector<string> results(istream_iterator<string>{iss},
+                               istream_iterator<string>());
+        for (auto i : results)
+        {
+            float s = stof(i);
+            v.push_back(s);
+        }
+
+        xmin = min(xmin, v[0]);
+        xmax = max(xmax, v[0]);
+        ymin = min(ymin, v[1]);
+        ymax = max(ymax, v[1]);
+        zmin = min(zmin, v[2]);
+        zmax = max(zmax, v[2]);
+        vec.push_back(v);
+    }
+
+    while (getline(MyReadFile, line))
+    {
+        vector<int> v;
+        istringstream iss(line);
+        vector<string> results(istream_iterator<string>{iss},
+                               istream_iterator<string>());
+        for (int i = 1; i < 4; i++)
+        {
+            int s = stoi(results[i]);
+            v.push_back(s);
+        }
+        triangles.push_back(v);
+    }
+
+    MyReadFile.close();
+    cout << triangles.size();
+
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
+    glutInitWindowPosition(50, 50);
+    glutInitWindowSize(1000, 1000);
+    glutCreateWindow("Programming Assignment 2");
+    init();
+    glutDisplayFunc(display);
+    glutMainLoop();
+    return 0;
 }
